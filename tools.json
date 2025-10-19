@@ -1,0 +1,63 @@
+[
+  {
+    "name": "ragflow_retrieval",
+    "description": "Search RAGFlow datasets and retrieve relevant documents for a given question. Supports filtering by dataset/document IDs and advanced search parameters.",
+    "arguments": [
+      {
+        "name": "question",
+        "type": "string",
+        "desc": "The question or query to search for in RAGFlow datasets"
+      },
+      {
+        "name": "dataset_ids",
+        "type": "array",
+        "desc": "Optional list of dataset IDs to search in. If omitted, searches all available datasets"
+      },
+      {
+        "name": "document_ids",
+        "type": "array",
+        "desc": "Optional list of specific document IDs to filter search results"
+      },
+      {
+        "name": "page",
+        "type": "integer",
+        "desc": "Page number for pagination (1-indexed)"
+      },
+      {
+        "name": "page_size",
+        "type": "integer",
+        "desc": "Number of results per page (recommended: 5-20 to avoid token limits)"
+      },
+      {
+        "name": "similarity_threshold",
+        "type": "number",
+        "desc": "Minimum similarity score threshold for results (0.0-1.0)"
+      },
+      {
+        "name": "vector_similarity_weight",
+        "type": "number",
+        "desc": "Weight balance between vector and keyword similarity (0.0=keyword only, 1.0=vector only)"
+      },
+      {
+        "name": "keyword",
+        "type": "boolean",
+        "desc": "Enable keyword-based search in addition to vector search"
+      },
+      {
+        "name": "top_k",
+        "type": "integer",
+        "desc": "Maximum number of candidates to consider before final ranking"
+      },
+      {
+        "name": "rerank_id",
+        "type": "string",
+        "desc": "Optional reranking model identifier for result ordering"
+      },
+      {
+        "name": "force_refresh",
+        "type": "boolean",
+        "desc": "Force refresh cached metadata (use sparingly for performance)"
+      }
+    ]
+  }
+]
