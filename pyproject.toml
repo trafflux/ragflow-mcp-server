@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ragflow-mcp-server"
+version = "2.0.0"
+description = "Production-ready Model Context Protocol server for RAGFlow with Streamable HTTP support"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Philip Van de Walker", github = "https://github.com/trafflux" }
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "ragflow",
+    "copilot",
+    "ai-tools"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+dependencies = [
+    "mcp>=0.9.0",
+    "aiohttp>=3.9.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+ragflow-mcp = "mcp_app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_app.py"]

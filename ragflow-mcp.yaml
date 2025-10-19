@@ -1,0 +1,78 @@
+# Docker MCP Toolkit Server Catalog Definition
+# Register RAGFlow MCP Server with the Docker MCP Gateway
+
+registry:
+  ragflow-mcp:
+    description: "RAGFlow Document Retrieval MCP Server - Search and retrieve documents from RAGFlow knowledge bases"
+    title: "RAGFlow MCP"
+    type: "server"
+    dateAdded: "2025-10-19"
+    image: "ragflow-mcp-server:latest"
+    maintainer: "Philip Van de Walker | @trafflux |  https://github.com/trafflux
+    # Tools provided by this server
+    tools:
+      - name: "ragflow_retrieval"
+        description: "Search RAGFlow datasets and retrieve relevant documents for a given question"
+
+    # Required secrets
+    secrets:
+      - name: "ragflow-mcp.api_key"
+        env: "RAGFLOW_API_KEY"
+        example: "ragflow-xxxxxxxxxxxxxxxx"
+
+    # Environment variables and configuration
+    env:
+      - name: "RAGFLOW_BASE_URL"
+        value: "http://ragflow:9380"
+      - name: "RAGFLOW_API_KEY"
+        value: "{{ragflow-mcp.api_key}}"
+
+    # Volumes (stdout for logging, /tmp for temporary data)
+    volumes:
+      - "/tmp:/tmp"
+
+    # Configuration schema for dynamic configuration
+    config:
+      - name: "ragflow-mcp"
+        description: "RAGFlow MCP Server Configuration"
+        type: "object"
+        properties:
+          base_url:
+            type: "string"
+            description: "RAGFlow backend server URL (e.g., http://ragflow:9380)"
+            default: "http://ragflow:9380"
+          api_key:
+            type: "string"
+            description: "RAGFlow API key for authentication"
+          similarity_threshold:
+            type: "number"
+            description: "Default similarity threshold for searches (0.0-1.0)"
+            default: 0.2
+            minimum: 0.0
+            maximum: 1.0
+          page_size:
+            type: "integer"
+            description: "Default number of results per page"
+            default: 10
+            minimum: 1
+            maximum: 100
+        required:
+          - api_key
+
+    # Metadata for discovery and categorization
+    metadata:
+      category: "knowledge-retrieval"
+      tags:
+        - "ragflow"
+        - "documents"
+        - "search"
+        - "retrieval"
+        - "ai"
+        - "knowledge-base"
+      license: "Apache-2.0"
+      owner: "ragflow"
+
+    # Documentation and source links
+    readme: "https://github.com/trafflux/ragflow-mcp-server/blob/main/README.md"
+    source: "https://github.com/trafflux/ragflow-mcp-server"
+    upstream: "https://github.com/trafflux/ragflow-mcp-server"
