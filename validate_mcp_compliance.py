@@ -198,6 +198,11 @@ def validate_entrypoint(path: Path) -> bool:
     if 'exec' in content:
         print("  ✅ Uses exec for proper signal handling")
     
+    if 'uv run' in content:
+        print("  ✅ Uses uv for Python package management")
+    else:
+        print("  ⚠️  Should use 'uv run' for Python execution")
+    
     print("  ✅ docker-entrypoint.sh looks good")
     return True
 

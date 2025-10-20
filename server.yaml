@@ -33,21 +33,25 @@ source:
 config:
   description: Configure connection to RAGFlow backend server
   secrets:
-    - name: ragflow-mcp-server.api_key
+    - name: ragflow-mcp-server.ragflow_api_key
       env: RAGFLOW_API_KEY
       example: ragflow-xxxxxxxxxxxxxxxx
   env:
     - name: RAGFLOW_BASE_URL
       example: http://ragflow:9380
-      value: '{{ragflow-mcp-server.base_url}}'
+      value: '{{ragflow-mcp-server.ragflow_base_url}}'
   parameters:
     type: object
     properties:
-      base_url:
+      ragflow_base_url:
         type: string
         description: RAGFlow backend server URL
         default: http://ragflow:9380
-    required: []
+      ragflow_api_key:
+        type: string
+        description: RAGFlow API key for authentication
+    required:
+      - ragflow_api_key
 
 tools:
   - name: ragflow_retrieval

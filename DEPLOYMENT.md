@@ -6,45 +6,142 @@ This guide covers deploying the RAGFlow MCP Server with Docker MCP Toolkit compl
 
 - [ ] RAGFlow backend is running and accessible
 - [ ] RAGFlow API key is obtained
-- [ ] Docker Desktop with MCP Toolkit installed
+- [ ] Docker Desktop with MCP Toolkit installed (Settings > Features > Enable MCP Toolkit)
 - [ ] Docker CLI version 24.0 or later
 
-## Quick Start with Docker MCP Toolkit
+## Local Testing with Docker Desktop MCP Toolkit
 
-### 1. Add Server to Docker MCP Registry
+### Step 1: Build the Docker Image Locally
 
-If the server is published in the Docker MCP Registry:
+```bash
+# Build the image with a local tag
+docker build -t ragflow-mcp-server:local .
+```
+
+### Step 2: Create a Local Catalog
+
+Create a file `ragflow-mcp-catalog.yaml` with the following content (note the `image` field points to your local build):
+
+```yaml
+version: 2
+name: ragflow-local
+displayName: RAGFlow MCP (Local)
+registry:
+  ragflow-mcp-server:
+    description: "RAGFlow Document Retrieval MCP Server"
+    title: "RAGFlow MCP Server"
+    type: server
+    image: ragflow-mcp-server:local  # Points to local build
+    tools:
+      - name: ragflow_retrieval
+        description: Search RAGFlow datasets and retrieve relevant documents
+    config:
+      description: Configure connection to RAGFlow backend server
+      secrets:
+        - name: ragflow-mcp-server.ragflow_api_key
+          env: RAGFLOW_API_KEY
+          example: ragflow-xxxxxxxxxxxxxxxx
+      env:
+        - name: RAGFLOW_BASE_URL
+          example: http://ragflow:9380
+          value: '{{ragflow-mcp-server.ragflow_base_url}}'
+      parameters:
+        type: object
+        properties:
+          ragflow_base_url:
+            type: string
+            description: RAGFlow backend server URL
+            default: http://ragflow:9380
+          ragflow_api_key:
+            type: string
+            description: RAGFlow API key for authentication
+        required:
+          - ragflow_api_key
+    meta:
+      category: knowledge-retrieval
+      tags:
+        - ragflow
+        - documents
+        - search
+        - retrieval
+```
+
+### Step 3: Import the Local Catalog
+
+```bash
+# Import the local catalog into Docker Desktop
+docker mcp catalog import ragflow-mcp-catalog.yaml
+```
+
+### Step 4: Configure in Docker Desktop UI
+
+1. Open **Docker Desktop**
+2. Go to **Settings** → **MCP Toolkit**
+3. You should see **RAGFlow MCP Server** in the list
+4. Click on it to configure:
+   - Set **ragflow_api_key**: Your RAGFlow API key (e.g., `ragflow-xxxxxxxx`)
+   - Set **ragflow_base_url**: Your RAGFlow server URL (e.g., `http://host.docker.internal:9380`)
+5. Toggle the switch to **Enable** the server
+6. Click **Apply & Restart**
+
+### Step 5: Verify in Docker Desktop
+
+After enabling, the MCP server should appear as active in the MCP Toolkit section. You can:
+- View available tools
+- Check server status
+- View logs if there are any issues
+
+### Step 6: Test with MCP Client
+
+Configure your MCP client (Claude Desktop, VS Code Copilot, etc.) to use the Docker MCP Gateway:
+
+```json
+{
+  "mcpServers": {
+    "docker-mcp-gateway": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-v", "~/.docker/mcp:/mcp",
+        "docker/mcp-gateway",
+        "--catalog=/mcp/catalogs/ragflow-local.yaml",
+        "--transport=stdio"
+      ]
+    }
+  }
+}
+```
+
+### Troubleshooting Local Testing
+
+**Issue: Server not appearing in Docker Desktop UI**
+- Ensure MCP Toolkit is enabled in Docker Desktop Settings
+- Verify catalog was imported: `docker mcp catalog list`
+- Check the catalog file syntax is valid YAML
+
+**Issue: Server fails to start**
+- Check Docker Desktop logs for the MCP server
+- Verify the image was built: `docker images ragflow-mcp-server:local`
+- Ensure RAGFlow backend is accessible from Docker containers
+
+**Issue: Can't connect to RAGFlow backend**
+- Use `host.docker.internal` instead of `localhost` if RAGFlow runs on host
+- Verify RAGFlow is accessible: `curl http://your-ragflow:9380/api/v1/datasets`
+- Check firewall rules allow Docker containers to access RAGFlow
+
+## Production Deployment
+
+### Quick Start with Docker MCP Registry (After Publication)
+
+Once published to the Docker MCP Registry:
 
 ```bash
 # Add from official registry
 docker mcp server add ragflow-mcp-server
-```
 
-Or use the local `server.yaml`:
-
-```bash
-# Import from this repository
-docker mcp catalog import ./server.yaml
-```
-
-### 2. Configure Secrets
-
-```bash
-# Set RAGFlow API key
-docker mcp secret set ragflow-mcp-server.api_key="ragflow-xxxxxxxx"
-
-# Set base URL (optional, defaults to http://ragflow:9380)
-docker mcp env set ragflow-mcp-server.base_url="http://your-ragflow:9380"
-```
-
-### 3. Enable and Test
-
-```bash
-# Enable the server
-docker mcp server enable ragflow-mcp-server
-
-# List available tools
-docker mcp server tools ragflow-mcp-server
+# Configure via Docker Desktop UI
+# Settings → MCP Toolkit → RAGFlow MCP Server
 ```
 
 ## Manual Docker Deployment

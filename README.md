@@ -7,15 +7,34 @@ A Model Context Protocol (MCP) server that provides GitHub Copilot and other MCP
 
 This server is fully compliant with the [Docker MCP Registry](https://github.com/docker/mcp-servers) standards and can be easily deployed using Docker Desktop's MCP Toolkit or the Docker MCP Gateway.
 
-### Quick Start with Docker MCP Toolkit
+### Local Testing with Docker Desktop
+
+**Step 1: Build locally**
+```bash
+docker build -t ragflow-mcp-server:local .
+```
+
+**Step 2: Import the local catalog**
+```bash
+docker mcp catalog import ragflow-mcp-catalog.yaml
+```
+
+**Step 3: Configure in Docker Desktop**
+1. Open Docker Desktop → Settings → MCP Toolkit
+2. Find "RAGFlow MCP Server" in the list
+3. Set your RAGFlow API key and base URL
+4. Toggle to enable the server
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed local testing instructions.
+
+### Production Deployment (After Registry Publication)
 
 ```bash
-# Using Docker Desktop's MCP Toolkit
+# Add from Docker MCP Registry
 docker mcp server add ragflow-mcp-server
-
-# Configure your RAGFlow credentials
-docker mcp secret set ragflow-mcp-server.api_key="ragflow-xxxxxxxx"
 ```
+
+Configure via Docker Desktop UI (Settings → MCP Toolkit → RAGFlow MCP Server).
 
 ## Overview
 
