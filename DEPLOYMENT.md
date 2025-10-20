@@ -18,60 +18,28 @@ This guide covers deploying the RAGFlow MCP Server with Docker MCP Toolkit compl
 docker build -t ragflow-mcp-server:local .
 ```
 
-### Step 2: Create a Local Catalog
+### Step 2: Install the Local Catalog
 
-Create a file `ragflow-mcp-catalog.yaml` with the following content (note the `image` field points to your local build):
+Place the catalog file in Docker Desktop's MCP directory:
 
-```yaml
-version: 2
-name: ragflow-local
-displayName: RAGFlow MCP (Local)
-registry:
-  ragflow-mcp-server:
-    description: "RAGFlow Document Retrieval MCP Server"
-    title: "RAGFlow MCP Server"
-    type: server
-    image: ragflow-mcp-server:local  # Points to local build
-    tools:
-      - name: ragflow_retrieval
-        description: Search RAGFlow datasets and retrieve relevant documents
-    config:
-      description: Configure connection to RAGFlow backend server
-      secrets:
-        - name: ragflow-mcp-server.ragflow_api_key
-          env: RAGFLOW_API_KEY
-          example: ragflow-xxxxxxxxxxxxxxxx
-      env:
-        - name: RAGFLOW_BASE_URL
-          example: http://ragflow:9380
-          value: '{{ragflow-mcp-server.ragflow_base_url}}'
-      parameters:
-        type: object
-        properties:
-          ragflow_base_url:
-            type: string
-            description: RAGFlow backend server URL
-            default: http://ragflow:9380
-          ragflow_api_key:
-            type: string
-            description: RAGFlow API key for authentication
-        required:
-          - ragflow_api_key
-    meta:
-      category: knowledge-retrieval
-      tags:
-        - ragflow
-        - documents
-        - search
-        - retrieval
-```
-
-### Step 3: Import the Local Catalog
-
+**macOS/Linux:**
 ```bash
-# Import the local catalog into Docker Desktop
-docker mcp catalog import ragflow-mcp-catalog.yaml
+mkdir -p ~/.docker/mcp/catalogs
+cp ragflow-mcp-catalog.yaml ~/.docker/mcp/catalogs/ragflow-local.yaml
 ```
+
+**Windows (PowerShell):**
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.docker\mcp\catalogs"
+Copy-Item ragflow-mcp-catalog.yaml "$env:USERPROFILE\.docker\mcp\catalogs\ragflow-local.yaml"
+```
+
+### Step 3: Restart Docker Desktop
+
+After placing the catalog file, restart Docker Desktop to load the new catalog:
+1. Quit Docker Desktop completely
+2. Restart Docker Desktop
+3. Wait for it to fully initialize (watch for the Docker icon to become steady)
 
 ### Step 4: Configure in Docker Desktop UI
 
@@ -116,14 +84,17 @@ Configure your MCP client (Claude Desktop, VS Code Copilot, etc.) to use the Doc
 ### Troubleshooting Local Testing
 
 **Issue: Server not appearing in Docker Desktop UI**
-- Ensure MCP Toolkit is enabled in Docker Desktop Settings
-- Verify catalog was imported: `docker mcp catalog list`
-- Check the catalog file syntax is valid YAML
+- Ensure the catalog file is in the correct location: `~/.docker/mcp/catalogs/ragflow-local.yaml`
+- Verify MCP Toolkit is enabled in Docker Desktop Settings → Features
+- Restart Docker Desktop completely (not just refresh)
+- Check the catalog file syntax: `python3 -c "import yaml; yaml.safe_load(open('ragflow-mcp-catalog.yaml'))"`
+- Check Docker Desktop logs for any catalog loading errors
 
 **Issue: Server fails to start**
 - Check Docker Desktop logs for the MCP server
-- Verify the image was built: `docker images ragflow-mcp-server:local`
+- Verify the image exists: `docker images ragflow-mcp-server:local`
 - Ensure RAGFlow backend is accessible from Docker containers
+- Try running manually to test: `docker run -it --rm -e RAGFLOW_API_KEY=test -e RAGFLOW_BASE_URL=http://host.docker.internal:9380 ragflow-mcp-server:local`
 
 **Issue: Can't connect to RAGFlow backend**
 - Use `host.docker.internal` instead of `localhost` if RAGFlow runs on host

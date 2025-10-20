@@ -18,20 +18,45 @@ docker build -t ragflow-mcp-server:local .
 
 This creates a local Docker image tagged as `ragflow-mcp-server:local`.
 
-### 2. Import the Local Catalog
+### 2. Place the Catalog File in Docker's MCP Directory
 
+The catalog file must be placed in Docker Desktop's MCP catalogs directory:
+
+**On macOS/Linux:**
 ```bash
-docker mcp catalog import ragflow-mcp-catalog.yaml
+mkdir -p ~/.docker/mcp/catalogs
+cp ragflow-mcp-catalog.yaml ~/.docker/mcp/catalogs/ragflow-local.yaml
 ```
 
-This imports the local testing catalog into Docker Desktop's MCP Toolkit.
+**On Windows (PowerShell):**
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.docker\mcp\catalogs"
+Copy-Item ragflow-mcp-catalog.yaml "$env:USERPROFILE\.docker\mcp\catalogs\ragflow-local.yaml"
+```
 
-### 3. Configure in Docker Desktop UI
+### 3. Restart Docker Desktop or Refresh Catalogs
+
+After placing the catalog file, you need to refresh Docker Desktop's MCP Toolkit:
+
+**Option A: Restart Docker Desktop** (Recommended)
+- Quit Docker Desktop completely
+- Restart Docker Desktop
+- Wait for it to fully initialize
+
+**Option B: Use Docker MCP CLI** (if available)
+```bash
+docker mcp catalog refresh
+```
+
+### 4. Configure in Docker Desktop UI
+
+### 4. Configure in Docker Desktop UI
 
 1. Open **Docker Desktop**
-2. Navigate to **Settings** → **MCP Toolkit**
-3. You should see **"RAGFlow MCP Server"** in the server list
-4. Click on the server to configure it
+2. Navigate to **Settings** → **MCP Toolkit**  
+   (Note: If you don't see MCP Toolkit, ensure it's enabled in Settings → Features)
+3. You should now see **"RAGFlow MCP Server"** in the server list
+4. Click on the server name to configure it
 5. Set the following parameters:
    - **ragflow_api_key**: Your RAGFlow API key (e.g., `ragflow-xxxxxxxxxxxxxxxx`)
    - **ragflow_base_url**: Your RAGFlow server URL
@@ -40,14 +65,16 @@ This imports the local testing catalog into Docker Desktop's MCP Toolkit.
 6. Toggle the switch to **Enable** the server
 7. Click **Apply & Restart**
 
-### 4. Verify the Server is Running
+### 5. Verify the Server is Running
+
+### 5. Verify the Server is Running
 
 After enabling, check in Docker Desktop:
 - The server status should show as **Active/Running**
 - You can view the server logs
 - Tools should be listed (e.g., `ragflow_retrieval`)
 
-### 5. Test with an MCP Client
+### 6. Test with an MCP Client
 
 Configure your MCP client (Claude Desktop, VS Code with Copilot, etc.) to use the Docker MCP Gateway:
 
@@ -109,9 +136,29 @@ The MCP client should:
 
 ### Server doesn't appear in Docker Desktop UI
 
-- Verify MCP Toolkit is enabled: Docker Desktop → Settings → Features
-- Check catalog was imported: `docker mcp catalog list`
-- Validate the catalog file: `python3 -c "import yaml; yaml.safe_load(open('ragflow-mcp-catalog.yaml'))"`
+**Cause**: Catalog file not in the correct location or Docker Desktop hasn't loaded it
+
+**Solutions**:
+1. Verify file location:
+   - macOS/Linux: `ls -la ~/.docker/mcp/catalogs/ragflow-local.yaml`
+   - Windows: `dir $env:USERPROFILE\.docker\mcp\catalogs\ragflow-local.yaml`
+
+2. Ensure MCP Toolkit is enabled:
+   - Open Docker Desktop
+   - Go to Settings → Features
+   - Verify "Enable MCP Toolkit" is checked
+
+3. Restart Docker Desktop **completely**:
+   - Quit Docker Desktop (not just close the window)
+   - Start Docker Desktop again
+   - Wait for the Docker icon to show "Running" status
+
+4. Check catalog file syntax:
+   ```bash
+   python3 -c "import yaml; yaml.safe_load(open('ragflow-mcp-catalog.yaml'))"
+   ```
+
+5. Check Docker Desktop logs for catalog loading errors
 
 ### Server fails to start
 

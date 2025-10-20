@@ -1,11 +1,14 @@
 # Local Catalog for Docker Desktop MCP Toolkit Testing
-# Use this file to test the RAGFlow MCP Server locally before publishing to Docker MCP Registry
+# This file enables local testing of the RAGFlow MCP Server before publishing to Docker MCP Registry
 #
-# Usage:
-#   1. Build the image: docker build -t ragflow-mcp-server:local .
-#   2. Import catalog: docker mcp catalog import ragflow-mcp-catalog.yaml
-#   3. Configure in Docker Desktop: Settings → MCP Toolkit → RAGFlow MCP Server
-#   4. Enable the server and set your RAGFlow API key and base URL
+# IMPORTANT: After building your local image, place this file in ~/.docker/mcp/catalogs/
+# and restart Docker Desktop or run: docker mcp catalog refresh
+#
+# Directory structure:
+#   ~/.docker/mcp/catalogs/ragflow-local.yaml  (this file)
+#
+# Then configure in Docker Desktop:
+#   Settings → MCP Toolkit → RAGFlow MCP Server
 
 version: 2
 name: ragflow-local
@@ -15,7 +18,7 @@ registry:
     description: "RAGFlow Document Retrieval MCP Server - Search and retrieve documents from RAGFlow knowledge bases"
     title: "RAGFlow MCP Server"
     type: server
-    image: ragflow-mcp-server:local  # Change to your local image tag
+    image: ragflow-mcp-server:local
     
     tools:
       - name: ragflow_retrieval

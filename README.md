@@ -14,18 +14,29 @@ This server is fully compliant with the [Docker MCP Registry](https://github.com
 docker build -t ragflow-mcp-server:local .
 ```
 
-**Step 2: Import the local catalog**
+**Step 2: Install the catalog**
 ```bash
-docker mcp catalog import ragflow-mcp-catalog.yaml
+# macOS/Linux
+mkdir -p ~/.docker/mcp/catalogs
+cp ragflow-mcp-catalog.yaml ~/.docker/mcp/catalogs/ragflow-local.yaml
+
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.docker\mcp\catalogs"
+Copy-Item ragflow-mcp-catalog.yaml "$env:USERPROFILE\.docker\mcp\catalogs\ragflow-local.yaml"
 ```
 
-**Step 3: Configure in Docker Desktop**
+**Step 3: Restart Docker Desktop**
+- Quit Docker Desktop completely
+- Restart Docker Desktop
+- Wait for full initialization
+
+**Step 4: Configure in Docker Desktop**
 1. Open Docker Desktop → Settings → MCP Toolkit
 2. Find "RAGFlow MCP Server" in the list
 3. Set your RAGFlow API key and base URL
 4. Toggle to enable the server
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed local testing instructions.
+See [LOCAL_TESTING.md](LOCAL_TESTING.md) for detailed instructions.
 
 ### Production Deployment (After Registry Publication)
 
