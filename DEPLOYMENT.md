@@ -1,89 +1,127 @@
-# RAGFlow MCP Server - Deployment Checklist
+# RAGFlow MCP Server - Deployment Guide
 
-## Pre-Deployment
+This guide covers deploying the RAGFlow MCP Server with Docker MCP Toolkit compliance.
+
+## Prerequisites
 
 - [ ] RAGFlow backend is running and accessible
 - [ ] RAGFlow API key is obtained
-- [ ] Docker/Docker Desktop is installed
-- [ ] MCP Gateway is available (for Docker integration)
+- [ ] Docker Desktop with MCP Toolkit installed
+- [ ] Docker CLI version 24.0 or later
 
-## Docker Build
+## Quick Start with Docker MCP Toolkit
+
+### 1. Add Server to Docker MCP Registry
+
+If the server is published in the Docker MCP Registry:
 
 ```bash
-cd /home/USER/projects/ragflow/docker
-docker build -t ragflow-mcp-server:latest -f mcp/server/Dockerfile mcp/server
+# Add from official registry
+docker mcp server add ragflow-mcp-server
+```
+
+Or use the local `server.yaml`:
+
+```bash
+# Import from this repository
+docker mcp catalog import ./server.yaml
+```
+
+### 2. Configure Secrets
+
+```bash
+# Set RAGFlow API key
+docker mcp secret set ragflow-mcp-server.api_key="ragflow-xxxxxxxx"
+
+# Set base URL (optional, defaults to http://ragflow:9380)
+docker mcp env set ragflow-mcp-server.base_url="http://your-ragflow:9380"
+```
+
+### 3. Enable and Test
+
+```bash
+# Enable the server
+docker mcp server enable ragflow-mcp-server
+
+# List available tools
+docker mcp server tools ragflow-mcp-server
+```
+
+## Manual Docker Deployment
+
+## Manual Docker Deployment
+
+### Docker Build
+
+```bash
+# Build the image
+docker build -t ragflow-mcp-server:latest .
 ```
 
 - [ ] Build completes without errors
-- [ ] Image size is ~226MB
+- [ ] Image created successfully
 - [ ] Verify with: `docker images ragflow-mcp-server`
 
-## Configuration
-
-Set environment variables:
-```bash
-export RAGFLOW_API_KEY="your-actual-api-key"
-export RAGFLOW_BASE_URL="http://ragflow-backend:9380"
-```
-
-- [ ] API key is valid
-- [ ] Base URL is correct and accessible
-- [ ] Backend is reachable from container network
-
-## Local Testing
+### Run Container Manually
 
 ```bash
-# Test 1: Direct run
-docker run --rm \
-  -e RAGFLOW_API_KEY="$RAGFLOW_API_KEY" \
-  -e RAGFLOW_BASE_URL="$RAGFLOW_BASE_URL" \
+# Run with environment variables
+docker run -i --rm \
+  -e RAGFLOW_API_KEY="ragflow-xxxxxxxx" \
+  -e RAGFLOW_BASE_URL="http://ragflow:9380" \
   ragflow-mcp-server:latest
-
-# Test 2: Docker Compose
-docker-compose -f docker-compose.ragflow-mcp.yml up
 ```
 
 - [ ] Server starts without errors
 - [ ] Shows "Transport: stdio" message
 - [ ] Connection pool initializes properly
-- [ ] Graceful shutdown on Ctrl+C
+- [ ] Responds to stdio MCP protocol messages
 
-## MCP Gateway Integration
+## MCP Client Configuration
 
-```bash
-# Copy catalog
-cp mcp/server/ragflow-mcp.yaml ~/.docker/mcp/catalogs/
+## MCP Client Configuration
 
-# Enable server
-docker mcp server enable ragflow-mcp
+### Using Docker MCP Gateway (Recommended)
 
-# Run gateway
-docker mcp gateway run --servers=ragflow-mcp
-```
+The Docker MCP Gateway automatically manages the server:
 
-- [ ] Catalog file copied successfully
-- [ ] Server appears in `docker mcp server list`
-- [ ] Gateway starts with ragflow-mcp enabled
-- [ ] Tools are discovered by MCP clients
-
-## Client Configuration
-
-### Claude Desktop
-Add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "ragflow-mcp": {
+    "mcp-toolkit-gateway": {
       "command": "docker",
-      "args": ["mcp", "gateway", "run", "--servers=ragflow-mcp"]
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-v", "~/.docker/mcp:/mcp",
+        "docker/mcp-gateway",
+        "--catalog=/mcp/catalogs/custom.yaml",
+        "--transport=stdio"
+      ]
     }
   }
 }
 ```
 
-- [ ] Configuration file updated
-- [ ] Claude Desktop restarted
-- [ ] MCP server appears in Claude interface
+### Direct Container Connection
+
+For advanced use cases, connect directly to the container:
+
+```json
+{
+  "mcpServers": {
+    "ragflow": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "RAGFLOW_API_KEY=ragflow-xxxxxxxx",
+        "-e", "RAGFLOW_BASE_URL=http://ragflow:9380",
+        "ragflow-mcp-server:latest"
+      ]
+    }
+  }
+}
+```
 
 ## Verification
 

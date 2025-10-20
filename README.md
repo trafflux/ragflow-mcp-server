@@ -1,6 +1,21 @@
 # RAGFlow MCP Server
 **Author: Philip Van de Walker | @trafflux |  https://github.com/trafflux**
+
 A Model Context Protocol (MCP) server that provides GitHub Copilot and other MCP clients with access to RAGFlow's document retrieval capabilities.
+
+## 🎯 Docker MCP Toolkit Compliant
+
+This server is fully compliant with the [Docker MCP Registry](https://github.com/docker/mcp-servers) standards and can be easily deployed using Docker Desktop's MCP Toolkit or the Docker MCP Gateway.
+
+### Quick Start with Docker MCP Toolkit
+
+```bash
+# Using Docker Desktop's MCP Toolkit
+docker mcp server add ragflow-mcp-server
+
+# Configure your RAGFlow credentials
+docker mcp secret set ragflow-mcp-server.api_key="ragflow-xxxxxxxx"
+```
 
 ## Overview
 
@@ -214,15 +229,28 @@ The server provides detailed logging. Check your MCP client's logs for error mes
 
 ## Contributing
 
+### Contributing to RAGFlow MCP Server
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
 
+### Contributing to Docker MCP Registry
+
+This server is designed to be listed in the [Official Docker MCP Registry](https://github.com/docker/mcp-servers). To contribute this server to the registry:
+
+1. Review the [Docker MCP Registry Contributing Guide](https://github.com/docker/mcp-servers/blob/main/CONTRIBUTING.md)
+2. This repository includes a compliant `server.yaml` file that can be submitted
+3. The `tools.json` file provides tool metadata for the registry
+4. Submit a pull request to the Docker MCP Registry with the server metadata
+
+For more details, see the [Docker MCP Toolkit Documentation](https://docs.docker.com/mcp/).
+
 ## License
 
-This project is part of the RAGFlow ecosystem. See the main RAGFlow repository for licensing information.
+This project is part of the RAGFlow ecosystem. Licensed under Apache License 2.0.
          │   RAGFlow Backend          │
          │   Port 9380                │
          │   (REST API)               │
