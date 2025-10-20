@@ -191,4 +191,6 @@ python3 -m json.tool tools.json > /dev/null
 
 **Last Updated**: October 2025
 
-**Version**: 2.0.0
+**Version**: 2.0.0 (Docker MCP Toolkit Compliance Release)
+
+**Note**: This compliance work maintains version 2.0.0 as defined in pyproject.toml. The changes add Docker MCP Registry support without breaking existing functionality.
