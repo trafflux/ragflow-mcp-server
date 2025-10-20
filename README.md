@@ -1,6 +1,23 @@
 # RAGFlow MCP Server
 **Author: Philip Van de Walker | @trafflux |  https://github.com/trafflux**
+
 A Model Context Protocol (MCP) server that provides GitHub Copilot and other MCP clients with access to RAGFlow's document retrieval capabilities.
+
+### Local Testing with Docker Desktop
+
+**Step 1: Build locally**
+```bash
+docker build -t ragflow-mcp-server:local .
+```
+
+### Production Deployment (After Registry Publication)
+
+```bash
+# Add from Docker MCP Registry
+docker mcp server add ragflow-mcp-server
+```
+
+Configure via Docker Desktop UI (Settings → MCP Toolkit → RAGFlow MCP Server).
 
 ## Overview
 
@@ -18,31 +35,26 @@ This MCP server enables AI assistants like GitHub Copilot to search and retrieve
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - Access to a running RAGFlow instance
 - RAGFlow API key
 
 ### Installation
 
-1. Navigate to the MCP server directory:
-   ```bash
-   cd mcp/server
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    uv sync
    ```
 
-3. Configure environment variables:
+2. Configure environment variables:
    ```bash
-   cp .env.example .env
-   # Edit .env with your RAGFlow API key and base URL
+   cp .env .env.local
+   # Edit .env.local with your RAGFlow API key and base URL
    ```
 
 ### Configuration
 
-Create a `.env` file with the following variables:
+Set the following environment variables:
 
 ```bash
 RAGFLOW_API_KEY=your-api-key-here
@@ -51,29 +63,79 @@ RAGFLOW_BASE_URL=http://localhost:9380
 
 ### Running the Server
 
-For stdio mode (recommended for Copilot):
-```bash
-uv run python3 mcp_app.py --mode stdio
-```
+The server uses stdio transport for MCP compliance:
 
-For HTTP mode:
 ```bash
-uv run python3 mcp_app.py --mode http
+# Using environment variables
+python3 -m mcp_app
+
+# Or with explicit CLI options
+python3 -m mcp_app --ragflow-api-key your-key --ragflow-base-url http://localhost:9380
 ```
 
 ## MCP Client Configuration
 
-### GitHub Copilot (VS Code)
+### GitHub Copilot (VS Code) - Docker-based Setup
 
-Add the following to your VS Code MCP configuration:
+For a containerized deployment that doesn't require a separate running server, add the following to your VS Code MCP configuration. This approach runs the MCP server as an ephemeral Docker container for each request:
+
+```json
+{
+  "mcpServers": {
+    "ragflow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "RAGFLOW_API_KEY=ragflow-xxxxxxxxx",
+        "-e",
+        "RAGFLOW_BASE_URL=http://host.docker.internal:9380",
+        "--add-host=host.docker.internal:host-gateway",
+        "--network",
+        "devnet",
+        "ragflow-mcp-server:local"
+      ]
+    }
+  }
+}
+```
+
+#### Environment Variables
+
+- `RAGFLOW_API_KEY`: Your RAGFlow API key (replace `ragflow-xxxxxxxxx` with your actual key)
+- `RAGFLOW_BASE_URL`: URL of your RAGFlow instance (default: `http://host.docker.internal:9380` for local Docker setups)
+
+#### Docker Arguments Explained
+
+- `--rm`: Automatically remove the container when it exits
+- `-i`: Keep STDIN open for interactive communication
+- `--add-host=host.docker.internal:host-gateway`: Maps host.docker.internal to the Docker host (for accessing services on the host machine)
+- `--network devnet`: Connects to the specified Docker network where RAGFlow is running
+
+#### Prerequisites
+
+1. **Build the Docker image**:
+   ```bash
+   docker build -t ragflow-mcp-server:local .
+   ```
+
+2. **Ensure RAGFlow is accessible**: The container needs to reach your RAGFlow instance via the configured `RAGFLOW_BASE_URL`
+
+3. **Network configuration**: Make sure the `--network` argument matches the Docker network where your RAGFlow instance is running
+
+### GitHub Copilot (VS Code) - Direct Python Setup
+
+For development or when Docker is not preferred, use the direct Python execution:
 
 ```json
 {
   "mcpServers": {
     "ragflow": {
-      "command": "uv",
-      "args": ["run", "python3", "mcp_app.py", "--mode", "stdio"],
-      "cwd": "/path/to/mcp/server",
+      "command": "python3",
+      "args": ["-m", "mcp_app"],
+      "cwd": "/path/to/ragflow-mcp-server",
       "env": {
         "RAGFLOW_API_KEY": "your-api-key",
         "RAGFLOW_BASE_URL": "http://localhost:9380"
@@ -82,22 +144,7 @@ Add the following to your VS Code MCP configuration:
   }
 }
 ```
-```json THIS IS WORKING:
-		"ragflow": {
-			"type": "stdio",
-			"command": "uv",
-			"args": [
-				"run",
-				"Z:\\home\\USER\\projects\\ragflow\\docker\\mcp\\server\\mcp_app.py",
-				"--mode",
-				"stdio"
-			],
-			"env": {
-				"RAGFLOW_API_KEY": "ragflow-xxxxxx",
-				"RAGFLOW_BASE_URL": "http://localhost:9380"
-			}
-		}
-    ```
+
 ### Other MCP Clients
 
 The server supports the standard MCP stdio transport protocol and can be configured with any MCP-compatible client.
@@ -164,39 +211,136 @@ The MCP server consists of:
 - **RAGFlowConnector**: Async HTTP client for communicating with RAGFlow API
 - **MCP Protocol Layer**: Handles MCP protocol messages and tool execution
 
+## Technical Implementation
+
+### Async Event Loop Management
+
+**Important**: This server uses lazy initialization of the aiohttp session within FastMCP's managed event loop. This is critical for compatibility:
+
+- ❌ **DON'T**: Pre-initialize the aiohttp session before `FastMCP.run()` (creates wrong event loop)
+- ✅ **DO**: Use `_ensure_connector_initialized()` to initialize on first tool invocation (uses correct event loop)
+
+**Why this matters**: aiohttp's timeout context manager must be created in the same event loop where tools execute. Initializing in a different loop causes:
+```
+RuntimeError: Timeout context manager should be used inside a task
+```
+
+See [TIMEOUT_FIX_FINAL.md](TIMEOUT_FIX_FINAL.md) for detailed technical explanation.
+
+### Connection Pooling
+
+- **Max Connections**: 100 total, 10 per host
+- **DNS TTL**: 300 seconds
+- **Session Reuse**: Connections pooled and reused across tool invocations
+- **Cleanup**: Automatic on server shutdown
+
+### Caching Strategy
+
+- **Datasets Cache**: LRU with 32 max items, 300s TTL
+- **Documents Cache**: LRU with 128 max items, 300s TTL
+- **Cache Key**: Dataset/document ID + parameters
+
 ## Development
 
 ### Project Structure
 
 ```
-mcp/
-├── server/
-│   ├── mcp_app.py          # Main MCP server
-│   ├── pyproject.toml      # Python dependencies
-│   ├── uv.lock            # Lock file
-│   ├── Dockerfile         # Docker configuration
-│   └── README.md          # This file
-└── client/                # Optional client utilities
-    ├── client.py
-    └── streamable_http_client.py
+ragflow-mcp-server/
+├── mcp_app.py              # Main MCP server (FastMCP)
+├── pyproject.toml          # Python project configuration
+├── uv.lock                 # Dependency lock file
+├── Dockerfile              # Docker container configuration
+├── docker-entrypoint.sh    # Docker entrypoint script
+├── tools.json              # MCP tool definitions
+├── .env                    # Environment variables (example)
+├── README.md               # This documentation
+└── IMPLEMENTATION.md       # Technical implementation details
 ```
 
 ### Testing
 
-Run the MCP server in stdio mode and use MCP client tools to test:
+Run the MCP server and use MCP client tools to test:
 
 ```bash
 # Test with MCP inspector
-npx @modelcontextprotocol/inspector uv run python3 mcp_app.py --mode stdio
+npx @modelcontextprotocol/inspector python3 -m mcp_app
+
+# Or test directly with environment variables set
+RAGFLOW_API_KEY=your-key RAGFLOW_BASE_URL=http://localhost:9380 \
+npx @modelcontextprotocol/inspector python3 -m mcp_app
 ```
 
 ### Docker Deployment
 
-Build and run with Docker:
+#### Building the Image
+
+Build the Docker image for local use or deployment:
 
 ```bash
-docker build -t ragflow-mcp .
-docker run -e RAGFLOW_API_KEY=your-key -e RAGFLOW_BASE_URL=http://host.docker.internal:9380 ragflow-mcp
+# Build with local tag
+docker build -t ragflow-mcp-server:local .
+
+# Or build with a specific version tag
+docker build -t ragflow-mcp-server:v1.0.0 .
+```
+
+#### Environment Variables for Docker
+
+When running the container, configure these environment variables:
+
+```bash
+# Required: RAGFlow API credentials
+RAGFLOW_API_KEY=your-ragflow-api-key-here
+RAGFLOW_BASE_URL=http://host.docker.internal:9380
+
+# Optional: Logging and debugging
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+```
+
+#### Running as Standalone Container
+
+For testing or development:
+
+```bash
+docker run -i --rm \
+  -e RAGFLOW_API_KEY=ragflow-xxxxxxxxx \
+  -e RAGFLOW_BASE_URL=http://host.docker.internal:9380 \
+  --add-host=host.docker.internal:host-gateway \
+  --network devnet \
+  ragflow-mcp-server:local
+```
+
+#### Production Deployment
+
+For production use, consider:
+
+```bash
+# Run with resource limits
+docker run -d \
+  --name ragflow-mcp-server \
+  --restart unless-stopped \
+  --memory 512m \
+  --cpus 0.5 \
+  -e RAGFLOW_API_KEY=ragflow-xxxxxxxxx \
+  -e RAGFLOW_BASE_URL=http://your-ragflow-host:9380 \
+  ragflow-mcp-server:local
+```
+
+#### Docker Compose Integration
+
+Add to your `docker-compose.yml`:
+
+```yaml
+services:
+  ragflow-mcp:
+    build: .
+    environment:
+      - RAGFLOW_API_KEY=ragflow-xxxxxxxxx
+      - RAGFLOW_BASE_URL=http://ragflow:9380
+    networks:
+      - ragflow-network
+    depends_on:
+      - ragflow
 ```
 
 ## Troubleshooting
@@ -214,15 +358,28 @@ The server provides detailed logging. Check your MCP client's logs for error mes
 
 ## Contributing
 
+### Contributing to RAGFlow MCP Server
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
 
+### Contributing to Docker MCP Registry
+
+This server is designed to be listed in the [Official Docker MCP Registry](https://github.com/docker/mcp-servers). To contribute this server to the registry:
+
+1. Review the [Docker MCP Registry Contributing Guide](https://github.com/docker/mcp-servers/blob/main/CONTRIBUTING.md)
+2. This repository includes a compliant `server.yaml` file that can be submitted
+3. The `tools.json` file provides tool metadata for the registry
+4. Submit a pull request to the Docker MCP Registry with the server metadata
+
+For more details, see the [Docker MCP Toolkit Documentation](https://docs.docker.com/mcp/).
+
 ## License
 
-This project is part of the RAGFlow ecosystem. See the main RAGFlow repository for licensing information.
+This project is part of the RAGFlow ecosystem. Licensed under Apache License 2.0.
          │   RAGFlow Backend          │
          │   Port 9380                │
          │   (REST API)               │
@@ -231,52 +388,37 @@ This project is part of the RAGFlow ecosystem. See the main RAGFlow repository f
 
 ## Installation
 
-### Option 1: Integrated with RAGFlow (Default)
+### Option 1: Docker Container (Recommended)
 
-The MCP server runs as part of the main ragflow container:
+Build and run the MCP server in a Docker container:
 
 ```bash
-cd /home/USER/projects/ragflow/docker
-docker-compose up -d
+# Build the image
+docker build -t ragflow-mcp-server:local .
+
+# Run with environment variables
+docker run -i --rm \
+  -e RAGFLOW_API_KEY=your-api-key \
+  -e RAGFLOW_BASE_URL=http://host.docker.internal:9380 \
+  --add-host=host.docker.internal:host-gateway \
+  --network devnet \
+  ragflow-mcp-server:local
 ```
 
-The server will be available at `http://localhost:9382/mcp/`
+### Option 2: Direct Python Installation
 
-### Option 2: Standalone Container
-
-Build and run the MCP server in its own container:
+Install and run directly with Python:
 
 ```bash
-cd /home/USER/projects/ragflow/docker/mcp/server
-
-# Build
-docker build -t ragflow-mcp:latest .
-
-# Run
-docker run -d \
-  --name ragflow-mcp \
-  -p 9382:9382 \
-  -e MCP_BASE_URL=http://ragflow:9380 \
-  -e MCP_API_KEY=your-api-key \
-  --network ragflow \
-  ragflow-mcp:latest
-```
-
-### Option 3: Direct Python
-
-```bash
-cd /home/USER/projects/ragflow/docker/mcp/server
-
 # Install dependencies
-pip install -r requirements.txt
+uv sync
 
-# Run
-python mcp_app.py \
-  --mode http \
-  --host 0.0.0.0 \
-  --port 9382 \
-  --base-url http://127.0.0.1:9380 \
-  --api-key your-api-key
+# Set environment variables
+export RAGFLOW_API_KEY=your-api-key
+export RAGFLOW_BASE_URL=http://localhost:9380
+
+# Run the server
+python3 -m mcp_app
 ```
 
 ## Configuration
@@ -284,43 +426,70 @@ python mcp_app.py \
 ### Environment Variables
 
 ```bash
-# Transport mode: http (recommended) or stdio
-MCP_MODE=http
+# Required: RAGFlow API credentials
+RAGFLOW_API_KEY=your-ragflow-api-key-here
+RAGFLOW_BASE_URL=http://localhost:9380
 
-# Server binding (HTTP mode only)
-MCP_HOST=0.0.0.0
-MCP_PORT=9382
-
-# RAGFlow backend connection
-MCP_BASE_URL=http://127.0.0.1:9380
-MCP_API_KEY=ragflow-xxxxxxxx
+# Optional: Logging level
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
 ```
 
 ### Docker Compose
 
-In `docker-compose.yml`, add or update environment section:
+For containerized deployment, add to your `docker-compose.yml`:
 
 ```yaml
-environment:
-  - MCP_MODE=http
-  - MCP_HOST=0.0.0.0
-  - MCP_PORT=9382
-  - MCP_BASE_URL=http://127.0.0.1:9380
-  - MCP_API_KEY=your-api-key
+services:
+  ragflow-mcp:
+    build: .
+    environment:
+      - RAGFLOW_API_KEY=your-api-key
+      - RAGFLOW_BASE_URL=http://ragflow:9380
+    networks:
+      - ragflow-network
+    depends_on:
+      - ragflow
 ```
 
 ## VS Code Copilot Configuration
 
-Update `~/.config/Code/User/mcp.json` (or `%APPDATA%\Code\User\mcp.json` on Windows):
+Update your VS Code MCP settings to include the RAGFlow server:
 
+**For Docker-based setup:**
 ```json
 {
-  "servers": {
+  "mcpServers": {
+    "ragflow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "RAGFLOW_API_KEY=your-api-key",
+        "-e",
+        "RAGFLOW_BASE_URL=http://host.docker.internal:9380",
+        "--add-host=host.docker.internal:host-gateway",
+        "--network",
+        "devnet",
+        "ragflow-mcp-server:local"
+      ]
+    }
+  }
+}
+```
+
+**For direct Python setup:**
+```json
+{
+  "mcpServers": {
     "ragflow": {
-      "type": "http",
-      "url": "http://localhost:9382/mcp/",
+      "command": "python3",
+      "args": ["-m", "mcp_app"],
+      "cwd": "/path/to/ragflow-mcp-server",
       "env": {
-        "Authorization": "Bearer ragflow-xxxxxxxx"
+        "RAGFLOW_API_KEY": "your-api-key",
+        "RAGFLOW_BASE_URL": "http://localhost:9380"
       }
     }
   }
@@ -335,64 +504,58 @@ Update `~/.config/Code/User/mcp.json` (or `%APPDATA%\Code\User\mcp.json` on Wind
 
 ## Testing
 
-### From Windows PowerShell
+### Using MCP Inspector
 
-```powershell
-$headers = @{
-    "Authorization" = "Bearer ragflow-xxxxxxxx"
-    "Content-Type" = "application/json"
-    "Accept" = "application/json, text/event-stream"
-}
-
-$body = @{
-    jsonrpc = "2.0"
-    id = 1
-    method = "initialize"
-    params = @{
-        protocolVersion = "2024-11-05"
-        capabilities = @{}
-        clientInfo = @{
-            name = "test"
-            version = "1.0"
-        }
-    }
-} | ConvertTo-Json
-
-$response = Invoke-WebRequest -Uri "http://localhost:9382/mcp/" `
-    -Method POST `
-    -Headers $headers `
-    -Body $body `
-    -UseBasicParsing
-
-$response.StatusCode  # Should be 202 Accepted
-```
-
-### Health Check
+Test the server using the official MCP inspector:
 
 ```bash
-curl http://localhost:9382/health
+# Install MCP inspector if not already installed
+npm install -g @modelcontextprotocol/inspector
 
-# Response:
-# {"status":"healthy","server":"ragflow-mcp-server","version":"2.0.0","protocol":"2024-11-05"}
+# Test with environment variables
+RAGFLOW_API_KEY=your-key RAGFLOW_BASE_URL=http://localhost:9380 \
+mcp-inspector python3 -m mcp_app
 ```
 
-### List Tools
+### Manual Testing
 
-```python
-import json
-import requests
+You can also test the server manually by piping JSON-RPC messages:
 
-headers = {
-    "Authorization": "Bearer ragflow-xxxxxxxx",
-    "Content-Type": "application/json",
-    "Accept": "application/json, text/event-stream",
-}
+```bash
+# Initialize the server
+echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}}' | \
+RAGFLOW_API_KEY=your-key RAGFLOW_BASE_URL=http://localhost:9380 \
+python3 -m mcp_app
 
-request = {
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list",
-}
+# List available tools
+echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' | \
+RAGFLOW_API_KEY=your-key RAGFLOW_BASE_URL=http://localhost:9380 \
+python3 -m mcp_app
+```
+
+### Integration Testing
+
+For integration testing with actual RAGFlow data:
+
+```bash
+# Set your actual environment variables
+export RAGFLOW_API_KEY="your-actual-api-key"
+export RAGFLOW_BASE_URL="http://your-ragflow-host:9380"
+
+# Test a retrieval query
+echo '{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "ragflow_retrieval",
+    "arguments": {
+      "question": "What is RAGFlow?",
+      "page_size": 5
+    }
+  }
+}' | python3 -m mcp_app
+```
 
 response = requests.post(
     "http://localhost:9382/mcp/",
@@ -522,9 +685,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 ### Building from Source
 
 ```bash
-cd mcp/server
-pip install -e .  # Install in development mode
-python -m pytest   # Run tests
+# Install in development mode
+uv sync
+
+# Run tests (if available)
+python -m pytest
+
+# Run the server
+python3 -m mcp_app
 ```
 
 ## Migration from Old Server
